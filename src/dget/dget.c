@@ -253,7 +253,61 @@ void buildScheduleEntries(void)
 
 extern void MAIN_func_80101EF8(int32_t, int32_t);
 
-INCLUDE_ASM("asm/dget/nonmatchings/dget", initTournamentInfo);
+/* WIP - non-matching: 6 byte diffs: one sra scheduled late vs lbu delay slot */
+void initTournamentInfo(int32_t source)
+{
+	int32_t color;
+	int32_t param;
+	int16_t y;
+	int16_t x2;
+	int16_t y2;
+	uint8_t *saved;
+	uint8_t *tournamentPtr;
+	uint8_t value;
+	uint8_t masked;
+	uint8_t rowv;
+	int32_t t1;
+	int32_t t2;
+	RECT rect1;
+	RECT rect2;
+
+	MAIN_D_801353B0 = source;
+	if (source != 0) {
+		color = 0xE1;
+		setupBoxOrigin(readPStat(0xFE), &rect2);
+		y = -0x4F;
+		param = 8;
+	} else {
+		x2 = UI_BOX_DATA[2].finalPos.x + 4;
+		y2 = UI_BOX_DATA[2].finalPos.y + 3;
+		rowv = TOURNAMENT_SELECTED_ROW;
+		x2 = x2 + TOURNAMENT_SELECTED_COLUMN * 51 + 3;
+		y2 = y2 + rowv * 16 + 0x16;
+		rect2.x = x2;
+		rect2.y = y2;
+		rect2.w = 0x2A;
+		rect2.h = 0xD;
+		t1 = (t2 = 0xC1);
+		y = -0x31;
+		color = t1;
+		param = 0;
+	}
+	rect1.x = -0x7E;
+	rect1.y = y;
+	rect1.w = 0xFC;
+	rect1.h = 0x63;
+	createTextbox(3, color, &rect1, &rect2, tickTournamentInfo, renderTournamentInfo);
+	registerTextbox(3, param, 7, 0, 0);
+	saved = MAIN_D_80134FDC;
+	tournamentPtr = &TOURNAMENT_ARRAY[TOURNAMENT_SELECTED_COLUMN * 6];
+	value = tournamentPtr[TOURNAMENT_SELECTED_ROW];
+	masked = value;
+	masked = masked & 0x3F;
+	MAIN_D_80134FDC = getCupDataJumpTableEntry(getCupDataJumpTable(10, masked), 0) + 2;
+	MAIN_func_80101EF8(3, 0xFF);
+	ACTIVE_INSTRUCTION = 0x64;
+	MAIN_D_80134FDC = saved;
+}
 
 int32_t tournamentCheckFair(uint8_t value)
 {
@@ -482,7 +536,58 @@ void tickTournamentSchedule(void)
 	}
 }
 
-INCLUDE_ASM("asm/dget/nonmatchings/dget", renderTournamentSchedule);
+/* WIP - non-matching: s-register homes rotated (target x=s0 y=s1 x0=s2 uvY=s3 i=s4) */
+void renderTournamentSchedule(void)
+{
+	int16_t x;
+	int16_t y;
+	int16_t x0;
+	int16_t uvy;
+	int32_t i;
+	int16_t savedY;
+	int16_t savedX;
+	int32_t gridX;
+	int32_t row;
+	int32_t col;
+	int16_t uvx;
+
+	y = UI_BOX_DATA[2].finalPos.y + 3;
+	x0 = UI_BOX_DATA[2].finalPos.x + 4;
+	x = 0x34;
+	for (i = 0; i < 5; i++) {
+		renderVerticalLine(2, x, 2, 0x13);
+		renderVerticalLine(2, x, 0x16, 0x64);
+		x = x + 0x33;
+	}
+	renderHorizontalLine(2, 3, 0x14, 0xFE);
+	savedY = y;
+	x = x0 + TOURNAMENT_SELECTED_COLUMN * 51 + 3;
+	savedX = x0;
+	y = y + TOURNAMENT_SELECTED_ROW * 16 + 0x16;
+	renderSelectionCursor(x, y, 0x2A, 0xD, 4);
+	x = savedX + 0xC;
+	y = savedY + 2;
+	uvy = 0x6C;
+	renderString(0, x, y, 0x10, 0xC, 0, uvy, 4, 1);
+	renderString(0, x + 0x33, y, 0x10, 0xC, 0x10, 0x6C, 4, 1);
+	renderString(0, x + 0x66, y, 0x10, 0xC, 0x20, 0x6C, 4, 1);
+	renderString(0, x + 0x99, y, 0x10, 0xC, 0x30, 0x6C, 4, 1);
+	renderString(0, x + 0xCC, y, 0x10, 0xC, 0x40, 0x6C, 4, 1);
+	uvy = uvy + 0xC;
+	y = savedY + 0x18;
+	gridX = savedX + 0x14;
+	for (row = 0; row < 6; row++) {
+		x = gridX;
+		uvx = 0;
+		for (col = 0; col < 5; col++) {
+			renderString(0, x, y, 0x10, 0xC, uvx, uvy, 4, 1);
+			x = x + 0x33;
+			uvx = uvx + 0xC;
+		}
+		y = y + 0x10;
+		uvy = uvy + 0xC;
+	}
+}
 
 void tickTournamentInfo(void)
 {

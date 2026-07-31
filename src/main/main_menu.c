@@ -53,7 +53,7 @@ int8_t getFileCityTopMap(void);
 extern GsOT *ACTIVE_ORDERING_TABLE;
 extern int32_t MAIN_D_80135034;
 extern int32_t MAIN_D_80135038;
-extern int8_t MAIN_D_8013172B;
+extern int8_t MAIN_D_8013172B[];
 extern char *MOVE_NAMES[];
 extern TamerEntity TAMER_ENTITY;
 extern uint8_t INVENTORY_ITEM_TYPES[30];
@@ -154,7 +154,7 @@ void drawMainMenuStrings();
 void drawSaveSlotText(int32_t slot, int32_t row);
 char *MAIN_func_8010FB7C(int32_t value, char *buf);
 void MAIN_func_8010FBB0();
-void MAIN_func_8010FC48();
+void MAIN_func_8010FC48(int32_t page);
 void updateMemoryCardState();
 void tickMainMenu();
 int32_t MAIN_func_8011239C(MenuCursor *cursor, int32_t which);
@@ -162,7 +162,7 @@ int32_t MAIN_func_80112524(int32_t menu);
 void setMemoryCardReadError(int32_t id, int32_t slot);
 int32_t MAIN_func_801125A8(int32_t unused, int32_t mode);
 int32_t MAIN_func_80112628(int32_t channel, int32_t slot);
-void loadSaveSlotData();
+int32_t loadSaveSlotData(int32_t chan, int32_t slot, uint8_t *out);
 int32_t MAIN_func_8011296C(MenuCursor *cursor, int32_t which);
 void initializeDefaultSavegame();
 char *_strncpy(char *dst, char *src, int32_t n);
@@ -406,7 +406,50 @@ void renderSaveSlotBox(int32_t slot, int32_t x, int32_t y)
 	renderMenuBox(x, y, 0xE0, 0x24);
 }
 
-INCLUDE_ASM("asm/main/nonmatchings/main_menu", MAIN_func_8010DA44);
+/* WIP - non-matching: register rotation, 129/129 structural */
+void MAIN_func_8010DA44(void)
+{
+	POLY_FT4 *wb;
+	POLY_FT4 *wb2;
+	int32_t i;
+	int32_t page;
+	int32_t yy;
+	int32_t p10;
+	int32_t slot;
+	int32_t y;
+
+	wb = (POLY_FT4 *)GsGetWorkBase();
+	wb2 = (POLY_FT4 *)((uint8_t *)wb + 0x28);
+	renderText(wb, 0x3A, 0x18, 0, 0, 0xD6, 0xC, 0);
+	GsSetWorkBase((PACKET *)wb2);
+	renderMenuBox(0x30, 0x13, 0xE0, 0x16);
+	if (MAIN_D_80135038 < MAIN_D_8013172B[0] * 10) {
+		MAIN_D_80135038 = MAIN_D_80135038 + 2;
+	}
+	if (MAIN_D_8013172B[0] * 10 < MAIN_D_80135038) {
+		MAIN_D_80135038 = MAIN_D_80135038 - 2;
+	}
+	page = MAIN_D_80135038 / 10;
+	p10 = page * 10;
+	for (i = 1, slot = page + 1, yy = 0x24; i < 6; i++, slot++, yy += 0x24) {
+		y = yy + ((p10 - MAIN_D_80135038) * 36 / 10 + 0x29);
+		if (y < 0x29) {
+			y = 0x29;
+		}
+		if (!(y < 0xBA)) {
+			y = 0xB9;
+		}
+		renderSaveSlotBox(slot, 0x30, y);
+	}
+	y = (page * 10 - MAIN_D_80135038) * 36 / 10 + 0x29;
+	if (y < 0x29) {
+		y = 0x29;
+	}
+	if (!(y < 0xBA)) {
+		y = 0xB9;
+	}
+	renderSaveSlotBox(page, 0x30, y);
+}
 
 void renderContinueSaveSelection(void)
 {
@@ -656,7 +699,37 @@ void MAIN_func_8010FBB0(int32_t type, int32_t anim, int32_t color, int32_t pos)
 	}
 }
 
-INCLUDE_ASM("asm/main/nonmatchings/main_menu", MAIN_func_8010FC48);
+/* WIP - non-matching: 5 byte diffs: y/t s-register homes swapped */
+void MAIN_func_8010FC48(int32_t page)
+{
+	RECT rect;
+	int32_t y;
+	int32_t t;
+	int32_t i;
+
+	rect.x = 0;
+	rect.y = 0xC;
+	rect.w = 0xCC;
+	rect.h = 0x78;
+	clearTextSubArea(&rect);
+	for (i = 0, y = 0xC; i < 0xA;) {
+		drawString(&MAIN_D_80131658[((page + i + 1) / 10) * 6] + 2, 0, y);
+		t = page + i + 1;
+		drawString(&MAIN_D_80131658[(t % 10) * 6] + 2, 0xC, y);
+		t = (&MAIN_D_80131B2C[0x51C])[(page + i) * 0x40];
+		if (t != 0) {
+			drawString((char *)&MAIN_D_8013192C[(page + i) * 0x40] + 0x70E, 0x1E, y);
+			drawString(DIGIMON_DATA[t].name, 0x6C, y);
+		} else {
+			setTextColor(9);
+			drawString(&MAIN_D_801346C0, 0x1E, y);
+			setTextColor(1);
+		}
+		DrawSync(0);
+		i++;
+		y += 0xC;
+	}
+}
 
 void updateMemoryCardState(void)
 {
@@ -803,7 +876,85 @@ int32_t MAIN_func_801125A8(int32_t unused, int32_t mode)
 
 INCLUDE_ASM("asm/main/nonmatchings/main_menu", MAIN_func_80112628);
 
-INCLUDE_ASM("asm/main/nonmatchings/main_menu", loadSaveSlotData);
+/* WIP - non-matching: zero-loop strength-reduced to pointer walk; target keeps index sum */
+typedef struct {
+	int32_t present;
+	char name[0x14];
+	char partner[0x14];
+	char playtime[0x18];
+} SlotEntry;
+
+int32_t loadSaveSlotData(int32_t chan, int32_t slot, uint8_t *out)
+{
+	unsigned long cmds;
+	unsigned long rslt;
+	long dirCount;
+	long buf[0x80];
+	int32_t i;
+	int32_t off;
+	int32_t doff;
+	int32_t ret;
+	char *title1;
+	char *title2;
+	char *title3;
+	char *dp;
+	uint8_t *entry;
+	char c;
+
+	MemCardSync(0, &cmds, &rslt);
+	ret = MemCardGetDirentry(chan, (char *)slot, MAIN_D_801346D0, &dirCount, 0, 0xF);
+	switch (ret) {
+	case 0:
+	case 3:
+		break;
+	case -1:
+		setMemoryCardReadError(0, 0);
+		return 0;
+	default:
+		setMemoryCardReadError(ret, 0);
+		return 0;
+	}
+	i = 0;
+	for (off = 0; i < 0xF; i++) {
+		*(int32_t *)&out[off] = 0;
+		off += 0x44;
+	}
+	i = 0;
+	doff = 0;
+	title1 = (char *)buf + 0x12;
+	title2 = (char *)buf + 0x20;
+	title3 = (char *)buf + 0x32;
+	while (i < dirCount) {
+		dp = (char *)MAIN_D_801346D0;
+		c = (&dp[doff])[0xF];
+		if (c >= 0x30 && c < 0x3A) {
+			slot = c - 0x30;
+		} else {
+			slot = c - 0x37;
+		}
+		if (MemCardReadFile(chan, dp + doff, buf, 0, 0x80) != 1) {
+			setMemoryCardReadError(0, 0);
+			return 0;
+		}
+		MemCardSync(0, &cmds, &rslt);
+		if (rslt != 0) {
+			setMemoryCardReadError(0, 0);
+			return 0;
+		}
+		slot = slot * 0x44;
+		entry = out + slot;
+		*(int32_t *)entry = 1;
+		strncpy((char *)entry + 4, title1, 0xD);
+		out[slot + 0x11] = 0;
+		strncpy((char *)entry + 0x18, title2, 0x11);
+		out[slot + 0x29] = 0;
+		strncpy((char *)entry + 0x2C, title3, 0x18);
+		out[slot + 0x43] = 0;
+		i++;
+		doff += 0x28;
+	}
+	return dirCount;
+}
 
 int32_t MAIN_func_8011296C(MenuCursor *cursor, int32_t which)
 {
@@ -851,7 +1002,85 @@ int32_t MAIN_func_8011296C(MenuCursor *cursor, int32_t which)
 	return 0;
 }
 
-INCLUDE_ASM("asm/main/nonmatchings/main_menu", initializeDefaultSavegame);
+/* WIP - non-matching: 36 register diffs, 113/113 structural */
+typedef struct {
+	uint8_t bytes[0x1E];
+} DefaultTable;
+
+typedef struct {
+	uint8_t unk_00;
+	uint8_t unk_01;
+	uint8_t unk_02;
+	uint8_t unk_03;
+} SaveRecord;
+
+typedef struct {
+	uint8_t unk_000[0x24];
+	SaveRecord records[0x64];
+	uint8_t unk_1B4[0x290 - 0x1B4];
+	uint8_t slots[6];
+	uint8_t unk_296[0x40C - 0x296];
+	uint8_t levels[0x1E];
+	uint8_t moves[0x1E];
+	uint8_t ids[0x1E];
+} SaveBuffer;
+
+void initializeDefaultSavegame(void)
+{
+	SaveBuffer *sav;
+	uint8_t *base;
+	uint8_t *p;
+	int32_t i;
+	int32_t j;
+	int32_t k;
+	int32_t m;
+	int32_t ch;
+	DefaultTable moves;
+	DefaultTable levels;
+	sav = (SaveBuffer *)MAIN_D_80131B2C;
+	base = (uint8_t *)sav;
+	i = 0;
+	p = base;
+	for (; i < 0xF00; i++) {
+		*p++ = 0;
+	}
+	*(int32_t *)&base[0] = 0;
+	base[0x49A] = 0xCC;
+	base[0x49C] = 0x9;
+	*(int32_t *)&base[0x1B8] = 0x72;
+	strcpy((char *)&base[0x467], &MAIN_D_801346C4);
+	strcpy((char *)&base[0x47B], &MAIN_D_8013468C);
+	for (j = 0; j < 0x64; j++) {
+		sav->records[j].unk_00 = 0xFF;
+		sav->records[j].unk_01 = 0xFF;
+		sav->records[j].unk_02 = 0xFF;
+		sav->records[j].unk_03 = 0;
+	}
+	*(int32_t *)&base[0x1B4] = 50000;
+	base[0x490] = 0;
+	base[0x491] = 1;
+	*(int16_t *)&base[0x1D0] = 0;
+	*(int16_t *)&base[0x1D2] = 0;
+	*(int16_t *)&base[0x1D4] = 8;
+	*(int16_t *)&base[0x1D6] = 0;
+	*(int16_t *)&base[0x1CC] = 0x2580;
+	*(int16_t *)&base[0x1CE] = 0x2580;
+	base[0x48F] = 3;
+	*(int16_t *)&base[0x228] = 0x120;
+	*(int16_t *)&base[0x22A] = 3;
+	ch = 0x3A;
+	for (k = 0; k < 6; k++, ch++) {
+		sav->slots[k] = ch;
+	}
+	moves = *(DefaultTable *)MAIN_D_801315F8;
+	levels = *(DefaultTable *)MAIN_D_80131618;
+	for (m = 0; m < 0x1E; m++) {
+		sav->levels[m] = levels.bytes[m];
+		sav->moves[m] = moves.bytes[m];
+		sav->ids[m] = m;
+	}
+	base[0x466] = 0x1E;
+}
 
 char *_strncpy(char *dst, char *src, int32_t n)
 {
