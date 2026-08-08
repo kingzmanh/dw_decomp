@@ -19,7 +19,7 @@ extern char MAIN_D_8012342C[];
 extern char MAIN_D_80134220[4];
 extern int16_t EFE_LOADED_MOVE_DATA[];
 extern char EFE_SCRIPT_MEM1_DATA[];
-extern char *EFE_DATA_STACK;
+extern int32_t **EFE_DATA_STACK;
 extern u_long SOME_IMAGE_DATA[];
 void setShortWithStride();
 void removeObject(int32_t objectId, int32_t instanceId);
@@ -247,7 +247,29 @@ void tickCloudFX(int32_t id)
 
 INCLUDE_ASM("asm/main/nonmatchings/efe", renderCloudFX);
 
-INCLUDE_ASM("asm/main/nonmatchings/efe", rotateVector);
+void rotateVector(void)
+{
+	MATRIX m;
+	SVECTOR vec;
+	SVECTOR rot;
+	SVECTOR out;
+	int32_t *vp;
+	int32_t *rp;
+
+	vp = *--EFE_DATA_STACK;
+	rp = *--EFE_DATA_STACK;
+	vec.vx = vp[0];
+	vec.vy = vp[1];
+	vec.vz = vp[2];
+	rot.vx = rp[0];
+	rot.vy = rp[1];
+	rot.vz = rp[2];
+	RotMatrixZYX(&rot, &m);
+	ApplyMatrixSV(&m, &vec, &out);
+	vp[0] = out.vx;
+	vp[1] = out.vy;
+	vp[2] = out.vz;
+}
 
 char *initializeFlashData(char *base)
 {
@@ -321,7 +343,7 @@ void findEFEDATFile(void)
 void initializeEFE(void)
 {
 	setShortWithStride(EFE_LOADED_MOVE_DATA, -1, 0x11, 2);
-	EFE_DATA_STACK = EFE_SCRIPT_MEM1_DATA;
+	EFE_DATA_STACK = (int32_t **)EFE_SCRIPT_MEM1_DATA;
 	findEFEDATFile();
 }
 
